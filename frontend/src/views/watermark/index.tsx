@@ -45,6 +45,7 @@ export default function WatermarkView() {
   const [rows, setRows] = useState<Row[]>([])
   const [total, setTotal] = useState(0)
   const [errorMessage, setErrorMessage] = useState('')
+  const [checkMessage, setCheckMessage] = useState('')
   const [filters, setFilters] = useState<Record<string, string>>({})
   const filterFields = useMemo(() => columns.slice(0, 3), [])
 
@@ -81,6 +82,19 @@ export default function WatermarkView() {
       await reload()
     } catch (error) {
       setErrorMessage(error instanceof Error ? error.message : '水位线管理操作失败')
+    }
+  }
+
+  async function checkReceipts(row: Row) {
+    setErrorMessage('')
+    setCheckMessage('')
+    try {
+      const response = await request(`${ENDPOINT}/${row.id}/receipt-check`, { method: 'POST' })
+      const payload = await response.json()
+      setCheckMessage(payload.message ?? '水位线结果校验已处理')
+      await reload()
+    } catch (error) {
+      setErrorMessage(error instanceof Error ? error.message : '水位线结果校验失败')
     }
   }
 
@@ -142,6 +156,9 @@ export default function WatermarkView() {
                     {action}
                   </button>
                 ))}
+                <button className="link" type="button" onClick={() => void checkReceipts(row)}>
+                  校验水位线
+                </button>
               </td>
             </tr>
           ))}
@@ -155,6 +172,7 @@ export default function WatermarkView() {
 
       <footer className="page-foot">
         <span>共 {total} 条水位线管理记录</span>
+        {checkMessage && <span>{checkMessage}</span>}
         {errorMessage && <span className="error-text">{errorMessage}</span>}
       </footer>
     </section>

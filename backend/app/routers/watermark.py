@@ -1,4 +1,8 @@
-"""水位线管理接口：维护水位线配置，覆盖启用水位线、暂停水位线、关闭水位线等动作。"""
+"""水位线管理接口：维护水位线配置，覆盖启用水位线、暂停水位线、关闭水位线等动作。
+
+另一个执行入口：receipt-check 用同一份输出批次数据回执校验水位线结果，
+消费侧据此继续后续处理；异常回执与较新水位确认冲突时只认最终确认的回执。
+"""
 from __future__ import annotations
 
 from typing import Any
@@ -6,6 +10,7 @@ from typing import Any
 from fastapi import APIRouter, HTTPException, Query
 
 from app.schemas import ActionResult, EntryPayload, PageResult
+from app.services.sinkreceipt import receipt_service
 from app.services.watermark import WatermarkService
 
 router = APIRouter(prefix="/api/watermark", tags=["水位线管理"])
@@ -56,6 +61,15 @@ def run_action(entry_id: int, payload: EntryPayload) -> ActionResult:
     if entry is None:
         return ActionResult(ok=False, message=message)
     return ActionResult(ok=True, message=message, entry=entry)
+
+
+@router.post("/{entry_id}/receipt-check", response_model=ActionResult)
+def receipt_check(entry_id: int) -> ActionResult:
+    """用同一份输出批次数据回执校验水位线结果；冲突时水位只退到最后确认批次，不越过失败批次。"""
+    result, message = receipt_service.check_watermark(entry_id)
+    if result is None:
+        return ActionResult(ok=False, message=message)
+    return ActionResult(ok=True, message=message, entry=result)
 
 
 @router.get("/export")
